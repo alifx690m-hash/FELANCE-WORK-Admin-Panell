@@ -30,6 +30,9 @@ jobs:
       - name: Flutter Doctor
         run: flutter doctor -v
 
+      - name: Create Android project
+        run: flutter create . --platforms=android --project-name=felance_work_admin
+
       - name: Install dependencies
         run: flutter pub get
 
