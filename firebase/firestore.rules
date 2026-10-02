@@ -1,0 +1,89 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    function hasPermission(p) {
+      return isAdmin() &&
+        (request.auth.token.permissions.hasAny([p, '*']));
+    }
+
+    match /admin_users/{uid} {
+      allow read: if isAdmin() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow update: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid;
+      allow delete: if false;
+    }
+
+    match /services/{id} {
+      allow read: if resource.data.status == 'APPROVED' || hasPermission('services.read');
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if signedIn() && resource.data.ownerId == request.auth.uid
+                    || hasPermission('services.update');
+      allow delete: if false;
+    }
+
+    match /orders/{id} {
+      allow read: if signedIn() &&
+        (resource.data.clientId == request.auth.uid ||
+         resource.data.providerId == request.auth.uid ||
+         hasPermission('orders.read'));
+      allow write: if false; // use trusted Cloud Functions for state-changing order operations
+    }
+
+    match /transactions/{id} {
+      allow read: if hasPermission('payments.read');
+      allow write: if false;
+    }
+
+    match /payouts/{id} {
+      allow read: if hasPermission('payouts.read');
+      allow write: if false;
+    }
+
+    match /ai_results/{id} {
+      allow read: if hasPermission('ai.read');
+      allow write: if false;
+    }
+
+    match /audit_logs/{id} {
+      allow read: if hasPermission('audit.read');
+      allow write: if false;
+    }
+
+    match /reports/{id} {
+      allow read: if hasPermission('reports.read');
+      allow write: if false;
+    }
+
+    match /support_tickets/{id} {
+      allow read: if hasPermission('support.read');
+      allow write: if false;
+    }
+
+    match /categories/{id} {
+      allow read: if true;
+      allow write: if hasPermission('categories.manage');
+    }
+
+    match /notifications/{id} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid
+                  || hasPermission('notifications.manage');
+      allow write: if hasPermission('notifications.manage');
+    }
+
+    match /settings/{id} {
+      allow read: if signedIn();
+      allow write: if hasPermission('settings.manage');
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
